@@ -91,7 +91,7 @@ def create_data_loaders(data_dir: str, batch_size: int = 2, num_workers: int = 4
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     val_ds = CacheDataset(data=val_files, transform=get_val_transforms(), cache_rate=1.0, num_workers=num_workers)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, num_workers=num_workers)
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=num_workers)
 
     #unlabelled_ds = CacheDataset(data=unlabelled_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
     #unlabelled_loader = DataLoader(unlabelled_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
