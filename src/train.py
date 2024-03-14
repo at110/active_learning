@@ -157,6 +157,6 @@ def main():
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=6, val_interval=1, root_dir="./models")
-
+    mlflow.end_run()
 if __name__ == "__main__":
     main()
