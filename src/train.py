@@ -8,6 +8,7 @@ from monai.data import decollate_batch
 from typing import Tuple
 from model import build_model  # Adjust the import path as necessary
 from data_loader import create_data_loaders  # Adjust the import path as necessary
+import mlflow
 
 def train_epoch(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                 optimizer: torch.optim.Optimizer, loss_function: torch.nn.Module, 
@@ -102,6 +103,7 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric = metric
         best_metric_epoch = epoch
         torch.save(model.state_dict(), os.path.join(root_dir, "best_metric_model.pth"))
+        mlflow.pytorch.log_model(model, "model")
         print("Saved new best metric model")
     else:
         best_metric_epoch = best_metric_epoch
@@ -134,19 +136,27 @@ def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoad
         print(f"Epoch {epoch + 1}/{max_epochs}")
         epoch_loss = train_epoch(model, train_loader, optimizer, loss_function, device)
         print(f"Average training loss: {epoch_loss:.4f}")
+        mlflow.log_metric("training_loss", epoch_loss, step=epoch)
 
         if (epoch + 1) % val_interval == 0:
             val_loss, metric = validate(model, val_loader, loss_function, device, post_pred, post_label, dice_metric)
             print(f"Validation loss: {val_loss:.4f}, Dice Metric: {metric:.4f}")
+            mlflow.log_metric("validation_loss", val_loss, step=epoch)
+            mlflow.log_metric("dice_metric", metric, step=epoch)
             best_metric, _ = save_best_model(metric, best_metric, model, epoch + 1, root_dir)
 
 def main():
+    mlflow.set_experiment("My Experiment Name")  # Set your experiment name
+    mlflow.start_run()
+    mlflow.set_tracking_uri("http://ec2-34-227-229-249.compute-1.amazonaws.com:5000/")
+    mlflow.log_param("learning_rate", 0)
+    mlflow.log_param("batch_size", 0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
     loaders = create_data_loaders(data_dir="./tests/", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=6, val_interval=2, root_dir="./models")
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=6, val_interval=1, root_dir="./models")
 
 if __name__ == "__main__":
     main()
