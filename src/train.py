@@ -102,7 +102,7 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
     if metric > best_metric:
         best_metric = metric
         best_metric_epoch = epoch
-        torch.save(model.state_dict(), os.path.join(root_dir, "best_metric_model.pth"))
+        #torch.save(model.state_dict(), os.path.join(root_dir, "best_metric_model.pth"))
         mlflow.pytorch.log_model(model, "model")
         print("Saved new best metric model")
     else:
@@ -146,9 +146,11 @@ def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoad
             best_metric, _ = save_best_model(metric, best_metric, model, epoch + 1, root_dir)
 
 def main():
-    mlflow.set_experiment("My Experiment Name")  # Set your experiment name
-    mlflow.start_run()
+    
     mlflow.set_tracking_uri("http://ec2-34-227-229-249.compute-1.amazonaws.com:5000/")
+    mlflow.set_experiment("Default")  # Set your experiment name
+    mlflow.start_run()
+   
     mlflow.log_param("learning_rate", 0)
     mlflow.log_param("batch_size", 0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
