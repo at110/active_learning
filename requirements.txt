@@ -1,0 +1,6 @@
+matplotlib
+monai-weekly[gdown, nibabel, tqdm, ignite]
+numpy
+scipy
+nibabel
+torch
