@@ -14,6 +14,10 @@ pip install -r requirements.txt
 
 export PYTHONPATH="${PYTHONPATH}:./src"
 
+export AWS_SECRET_ACCESS_KEY=""
+
+export AWS_ACCESS_KEY_ID=""
+
 # testing 
 
 python tests/test_train.py
