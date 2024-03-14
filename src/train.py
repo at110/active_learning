@@ -59,7 +59,7 @@ def validate(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader,
     """
     model.eval()
     val_loss = 0.0
-    
+
     steps = 0
     with torch.no_grad():
         for batch_data in val_loader:
@@ -97,6 +97,7 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
     - Tuple[float, int]: Updated best metric and epoch.
     """
     best_metric_epoch = 0
+    os.makedirs(root_dir, exist_ok=True)
     if metric > best_metric:
         best_metric = metric
         best_metric_epoch = epoch
