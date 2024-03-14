@@ -59,11 +59,12 @@ def validate(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader,
     """
     model.eval()
     val_loss = 0.0
+    
     steps = 0
     with torch.no_grad():
         for batch_data in val_loader:
             steps += 1
-            inputs, labels = batch_data["image"].to(device), batch_data["label"].to(device)
+            inputs, labels = (batch_data["image"].to(device), batch_data["label"].to(device))
             roi_size = (160, 160, 160)  # Adjust this to match your model's expected input dimensions
             sw_batch_size = 4  # Adjust based on your GPU memory
             # Assuming val_inputs is your input tensor shaped (batch_size, channels, D, H, W)
@@ -73,9 +74,9 @@ def validate(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader,
             outputs = sliding_window_inference(inputs, roi_size=(160, 160, 160), sw_batch_size=4, predictor=model)
             loss = loss_function(outputs, labels)
             val_loss += loss.item()
-            outputs = [post_pred(i) for i in decollate_batch(outputs)]
-            labels = [post_label(i) for i in decollate_batch(labels)]
-            dice_metric(y_pred=outputs, y=labels)
+            val_outputs = [post_pred(i) for i in decollate_batch(outputs)]
+            val_labels = [post_label(i) for i in decollate_batch(labels)]
+            dice_metric(y_pred=val_outputs, y=val_labels)
     metric = dice_metric.aggregate().item()
     dice_metric.reset()
     return val_loss / steps, metric
