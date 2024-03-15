@@ -113,7 +113,7 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
-def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=2, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
+def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=100, roi_size=(160, 160, 160), sw_batch_size=4):
     """
     Selects n samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
 
@@ -153,7 +153,7 @@ def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torc
         
         uncertainties.append(sample_uncertainty)
     # Select n samples with the highest uncertainty
-    indices = np.argsort(uncertainties)[-n:]
+    indices = np.argsort(uncertainties)
     print(indices)
 
     predicted_labels = [unlabelled_files[ indices[index]]['image'] for index in indices]
@@ -212,7 +212,7 @@ def main():
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=2, val_interval=1, root_dir="./models")
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=100, val_interval=1, root_dir="./models")
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,loaders["unlabelled"],device, loaders["unlabelled_files"] )
     print(indices)
     print(uncertainties)
