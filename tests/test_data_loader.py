@@ -12,7 +12,7 @@ class TestDataLoader(unittest.TestCase):
         # Check that all loaders are created
         self.assertIn('train', loaders)
         self.assertIn('val', loaders)
-        #self.assertIn('unlabelled', loaders)
+        self.assertIn('unlabelled', loaders)
         
         
         # Additional tests can be added here to check for specific transformations, data ranges, etc.

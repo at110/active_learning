@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 
+Spleen-stratified
+
 # C extensions
 *.so
 

@@ -9,6 +9,10 @@ from typing import Tuple
 from model import build_model  # Adjust the import path as necessary
 from data_loader import create_data_loaders  # Adjust the import path as necessary
 import mlflow
+import json
+import numpy as np
+from scipy.stats import entropy
+
 
 def train_epoch(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                 optimizer: torch.optim.Optimizer, loss_function: torch.nn.Module, 
@@ -109,6 +113,52 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
+def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=2, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
+    """
+    Selects n samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
+
+    Args:
+        model: The segmentation model with MC Dropout enabled.
+        unlabeled_dataset: The dataset of unlabeled samples.
+        n: Number of samples to select based on highest uncertainty.
+        mc_samples: Number of Monte Carlo forward passes for uncertainty estimation.
+        roi_size: Size of the ROI to process in one forward pass.
+        sw_batch_size: Number of sliding windows to process in parallel.
+
+    Returns:
+        indices: Indices of the selected samples based on uncertainty.
+    """
+    # Ensure model is in training mode to use MC Dropout during inference
+    model.train()
+    uncertainties = []
+
+    for i, data in enumerate(data_loader):
+        #inputs = inputs.cuda()  # Assuming use of GPU
+        mc_entropies = []
+
+        for _ in range(mc_samples):
+            with torch.no_grad():
+                # Use sliding_window_inference for each MC sample
+                outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model, overlap=0.5)
+                # Convert softmax probabilities
+                probabilities = torch.softmax(outputs, dim=1).cpu().numpy()
+                # Calculate pixel-wise entropy for the current MC sample
+                mc_entropy = entropy(probabilities, base=2, axis=1)
+                mc_entropies.append(mc_entropy)
+        
+        # Average entropy across MC samples to get a single uncertainty value per voxel
+        mean_entropy = np.mean(mc_entropies, axis=0)
+        # Average entropy across all voxels for a sample to get overall uncertainty
+        sample_uncertainty = np.mean(mean_entropy)
+        
+        uncertainties.append(sample_uncertainty)
+    # Select n samples with the highest uncertainty
+    indices = np.argsort(uncertainties)[-n:]
+    print(indices)
+
+    predicted_labels = [unlabelled_files[ indices[index]]['image'] for index in indices]
+    return indices, np.array(uncertainties)[indices],predicted_labels
+
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                  val_loader: torch.utils.data.DataLoader, optimizer: torch.optim.Optimizer, 
                  loss_function: torch.nn.Module, device: torch.device, max_epochs: int, 
@@ -146,19 +196,27 @@ def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoad
             best_metric, _ = save_best_model(metric, best_metric, model, epoch + 1, root_dir)
 
 def main():
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
     
-    mlflow.set_tracking_uri("http://ec2-34-227-229-249.compute-1.amazonaws.com:5000/")
-    mlflow.set_experiment("Default")  # Set your experiment name
-    mlflow.start_run()
+    mlflow.set_tracking_uri(config["mlflow_tracking_uri"])
+    mlflow.set_experiment(config["experiment_name"])  # Set your experiment name
+    mlflow.start_run(log_system_metrics=True)
    
-    mlflow.log_param("learning_rate", 0)
-    mlflow.log_param("batch_size", 0)
+
+    os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
+    mlflow.log_param("learning_rate", config["model_params"]["learning_rate"])
+    mlflow.log_param("batch_size", config["model_params"]["batch_size"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
-    loaders = create_data_loaders(data_dir="./tests/", batch_size=2, num_workers=4)
+    loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=6, val_interval=1, root_dir="./models")
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=2, val_interval=1, root_dir="./models")
+    indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,loaders["unlabelled"],device, loaders["unlabelled_files"] )
+    print(indices)
+    print(uncertainties)
+    print(files)
     mlflow.end_run()
 if __name__ == "__main__":
     main()
