@@ -231,7 +231,7 @@ def main():
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=10, val_interval=1, root_dir="./models")
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["train_params"]["max_epochs"], val_interval=config["train_params"]["val_interval"], root_dir="./models")
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,loaders["unlabelled"],device, loaders["unlabelled_files"] )
     log_to_mlflow(indices, uncertainties, files)
     print(indices)
