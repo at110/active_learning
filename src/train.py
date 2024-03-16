@@ -113,7 +113,7 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
-def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=100, roi_size=(160, 160, 160), sw_batch_size=4):
+def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
     """
     Selects n samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
 
@@ -158,6 +158,24 @@ def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torc
 
     predicted_labels = [unlabelled_files[ indices[index]]['image'] for index in indices]
     return indices, np.array(uncertainties)[indices],predicted_labels
+
+def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: List[str]):
+    # Save indices, uncertainties, and filenames to files
+    np.savetxt("indices.txt", indices, fmt='%i')
+    np.savetxt("uncertainties.txt", uncertainties)
+    with open("filenames.json", 'w') as f:
+        json.dump(filenames, f)
+
+    # Log files as artifacts
+    mlflow.log_artifact("indices.txt")
+    mlflow.log_artifact("uncertainties.txt")
+    mlflow.log_artifact("filenames.json")
+
+    # Cleanup
+    os.remove("indices.txt")
+    os.remove("uncertainties.txt")
+    os.remove("filenames.json")
+
 
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                  val_loader: torch.utils.data.DataLoader, optimizer: torch.optim.Optimizer, 
@@ -212,8 +230,9 @@ def main():
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=100, val_interval=1, root_dir="./models")
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=10, val_interval=1, root_dir="./models")
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,loaders["unlabelled"],device, loaders["unlabelled_files"] )
+    log_to_mlflow(indices, uncertainties, files)
     print(indices)
     print(uncertainties)
     print(files)

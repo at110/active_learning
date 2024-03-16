@@ -2,7 +2,7 @@
     "experiment_name": "Default",
     "mlflow_tracking_uri": "http://ec2-34-227-229-249.compute-1.amazonaws.com:5000/",
     "model_params": {
-      "learning_rate": 0.001,
+      "learning_rate": 0.0001,
       "batch_size": 2
     },
     "training_params": {
