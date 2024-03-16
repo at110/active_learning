@@ -13,6 +13,8 @@ import json
 import numpy as np
 from scipy.stats import entropy
 from typing import List, Tuple
+import nibabel as nib
+from monai.handlers.utils import from_engine
 
 
 def train_epoch(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
@@ -107,14 +109,14 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
     if metric > best_metric:
         best_metric = metric
         best_metric_epoch = epoch
-        #torch.save(model.state_dict(), os.path.join(root_dir, "best_metric_model.pth"))
+        torch.save(model.state_dict(), os.path.join(root_dir, "best_metric_model.pth"))
         mlflow.pytorch.log_model(model, "model")
         print("Saved new best metric model")
     else:
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
-def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
+def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
     """
     Selects n samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
 
@@ -130,6 +132,8 @@ def select_data_by_uncertainty_with_sw_inference(model, data_loader,device: torc
         indices: Indices of the selected samples based on uncertainty.
     """
     # Ensure model is in training mode to use MC Dropout during inference
+    model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
+
     model.train()
     uncertainties = []
 
@@ -177,6 +181,51 @@ def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: Lis
     os.remove("uncertainties.txt")
     os.remove("filenames.json")
 
+def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir, output_filename,post_pred: Compose):
+    """
+    Load the model's best state, predict labels for the second batch in the validation loader,
+    and save these predictions as a NIfTI file with an explicit data type conversion to int16.
+
+    Parameters:
+    - model: The trained PyTorch model.
+    - val_loader: DataLoader for the validation dataset.
+    - device: The device (e.g., "cpu" or "cuda") on which the model is running.
+    - root_dir: Directory where the best model checkpoint is saved.
+    - output_filename: Name of the output NIfTI file to save the predictions.
+    """
+    # Load the best saved model state
+    post_label = Compose([AsDiscrete(to_onehot=2)])
+    os.makedirs(op_dir, exist_ok=True)
+    model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
+    model.eval()
+    model.to(device)
+    subject_num = 0 
+    with torch.no_grad():
+        for data in loader:
+            if subject_num == index:  # Proceed only for the second batch
+                roi_size = (160, 160, 160)
+                sw_batch_size = 4
+                # Perform inference
+                #val_outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
+
+                data["pred"] = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
+
+                data = [post_pred(i) for i in decollate_batch(data)]
+                predictions = from_engine(["pred"])(data)
+                
+                predictions = predictions[0].detach().cpu()[1, :, :, :]
+
+                ## Convert the predictions tensor to int16 data type
+                predictions = predictions.numpy().astype(np.int16)
+
+                # Convert the predictions tensor to a NIfTI image
+                pred_nifti = nib.Nifti1Image(predictions, affine=np.eye(4))
+
+                # Save the NIfTI image to file
+                nib.save(pred_nifti, os.path.join(op_dir, output_filename))
+                print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, output_filename)}")
+                break  # Exit the loop after processing the required batch
+            subject_num+=1
 
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                  val_loader: torch.utils.data.DataLoader, optimizer: torch.optim.Optimizer, 
@@ -231,12 +280,10 @@ def main():
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["train_params"]["max_epochs"], val_interval=config["train_params"]["val_interval"], root_dir="./models")
-    indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,loaders["unlabelled"],device, loaders["unlabelled_files"] )
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["train_params"]["max_epochs"], val_interval=config["train_params"]["val_interval"], root_dir=config["root_dir"])
+    indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
     log_to_mlflow(indices, uncertainties, files)
-    print(indices)
-    print(uncertainties)
-    print(files)
+    save_prediction_as_nifti(model, loaders["val"],device, "./output", config["root_dir"], loaders["val_files"])
     mlflow.end_run()
 if __name__ == "__main__":
     main()
