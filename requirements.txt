@@ -6,3 +6,4 @@ nibabel
 torch
 mlflow
 boto3
+pynvml
