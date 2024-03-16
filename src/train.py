@@ -181,7 +181,7 @@ def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: Lis
     os.remove("uncertainties.txt")
     os.remove("filenames.json")
 
-def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir, output_filename,post_pred: Compose):
+def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir,filenames):
     """
     Load the model's best state, predict labels for the second batch in the validation loader,
     and save these predictions as a NIfTI file with an explicit data type conversion to int16.
@@ -210,7 +210,7 @@ def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir, out
 
                 data["pred"] = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
 
-                data = [post_pred(i) for i in decollate_batch(data)]
+                data = [post_label(i) for i in decollate_batch(data)]
                 predictions = from_engine(["pred"])(data)
                 
                 predictions = predictions[0].detach().cpu()[1, :, :, :]
@@ -222,9 +222,9 @@ def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir, out
                 pred_nifti = nib.Nifti1Image(predictions, affine=np.eye(4))
 
                 # Save the NIfTI image to file
-                nib.save(pred_nifti, os.path.join(op_dir, output_filename))
-                print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, output_filename)}")
-                break  # Exit the loop after processing the required batch
+                nib.save(pred_nifti, os.path.join(op_dir, filenames[subject_num]))
+                print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, filenames[subject_num])}")
+                # Exit the loop after processing the required batch
             subject_num+=1
 
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
@@ -275,7 +275,7 @@ def main():
     os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
     mlflow.log_param("learning_rate", config["model_params"]["learning_rate"])
     mlflow.log_param("batch_size", config["model_params"]["batch_size"])
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
