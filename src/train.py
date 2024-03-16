@@ -202,29 +202,29 @@ def save_prediction_as_nifti(model, loader, device, op_dir, root_dir,filenames):
     subject_num = 0 
     with torch.no_grad():
         for data in loader:
-            if subject_num == index:  # Proceed only for the second batch
-                roi_size = (160, 160, 160)
-                sw_batch_size = 4
-                # Perform inference
-                #val_outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
+           
+            roi_size = (160, 160, 160)
+            sw_batch_size = 4
+            # Perform inference
+            #val_outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
 
-                data["pred"] = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
+            data["pred"] = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
 
-                data = [post_label(i) for i in decollate_batch(data)]
-                predictions = from_engine(["pred"])(data)
-                
-                predictions = predictions[0].detach().cpu()[1, :, :, :]
+            data = [post_label(i) for i in decollate_batch(data)]
+            predictions = from_engine(["pred"])(data)
+            
+            predictions = predictions[0].detach().cpu()[1, :, :, :]
 
-                ## Convert the predictions tensor to int16 data type
-                predictions = predictions.numpy().astype(np.int16)
+            ## Convert the predictions tensor to int16 data type
+            predictions = predictions.numpy().astype(np.int16)
 
-                # Convert the predictions tensor to a NIfTI image
-                pred_nifti = nib.Nifti1Image(predictions, affine=np.eye(4))
+            # Convert the predictions tensor to a NIfTI image
+            pred_nifti = nib.Nifti1Image(predictions, affine=np.eye(4))
 
-                # Save the NIfTI image to file
-                nib.save(pred_nifti, os.path.join(op_dir, filenames[subject_num]))
-                print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, filenames[subject_num])}")
-                # Exit the loop after processing the required batch
+            # Save the NIfTI image to file
+            nib.save(pred_nifti, os.path.join(op_dir, filenames[subject_num]))
+            print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, filenames[subject_num])}")
+            # Exit the loop after processing the required batch
             subject_num+=1
 
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
