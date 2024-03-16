@@ -181,7 +181,7 @@ def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: Lis
     os.remove("uncertainties.txt")
     os.remove("filenames.json")
 
-def save_prediction_as_nifti(model, loader, index, device, op_dir, root_dir,filenames):
+def save_prediction_as_nifti(model, loader, device, op_dir, root_dir,filenames):
     """
     Load the model's best state, predict labels for the second batch in the validation loader,
     and save these predictions as a NIfTI file with an explicit data type conversion to int16.
