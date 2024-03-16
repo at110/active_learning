@@ -275,12 +275,13 @@ def main():
     os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
     mlflow.log_param("learning_rate", config["model_params"]["learning_rate"])
     mlflow.log_param("batch_size", config["model_params"]["batch_size"])
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
     loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
-    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["train_params"]["max_epochs"], val_interval=config["train_params"]["val_interval"], root_dir=config["root_dir"])
+    run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["training_params"]["max_epochs"], val_interval=config["training_params"]["val_interval"], root_dir=config["root_dir"])
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
     log_to_mlflow(indices, uncertainties, files)
     save_prediction_as_nifti(model, loaders["val"],device, "./output", config["root_dir"], loaders["val_files"])
