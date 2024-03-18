@@ -183,7 +183,7 @@ def select_data_by_uncertainty_with_sw_inference(
     for data in data_loader:
         # Assuming inputs are on GPU if available
         inputs = data["image"].to(device)
-        mc_predictions = torch.zeros((mc_samples, *inputs.shape), device=device)
+        mc_predictions = torch.zeros((mc_samples, *inputs.shape[1:]), device=device)
         
         for mc_sample in range(mc_samples):
             with torch.no_grad():
