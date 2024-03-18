@@ -122,103 +122,61 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
-def entropy_volume(vol_input: np.ndarray, dimension: int) -> np.ndarray:
+def entropy_volume(vol_input: torch.Tensor, dimension: int) -> torch.Tensor:
     """
-    Calculate the entropy of a given volumetric input. The input is expected to
-    have dimensions representing repetitions, channels, and volumetric data.
-
+    Calculate the entropy of a given volumetric input with repetitions and channels.
+    
     Parameters:
-        vol_input: The input volume, which can be a NumPy array or a PyTorch tensor.
-            It's expected to have the shape [repetitions, channels, *volume_dims] for
-            3D, or [repetitions, channels, *image_dims] for 2D.
-        dimension: The dimensionality of the volumetric data (2 for 2D images, 3 for 3D volumes).
-
+        vol_input: A PyTorch tensor of probabilities with shape [MC samples, Channels, *Spatial dimensions].
+        dimension: The spatial dimensionality of the volumetric data (2 or 3).
+    
     Returns:
-        A NumPy array representing the computed entropy volume, with the same spatial
-        dimensions as the input volume.
+        A tensor representing the computed entropy volume, with the same spatial dimensions as the input volume.
     """
-    # Ensure input is a NumPy array
-    vol_input = vol_input.cpu().detach().numpy() if isinstance(vol_input, torch.Tensor) else vol_input
-    vol_input = vol_input.astype(dtype="float32")
-    dims = vol_input.shape
-    reps = dims[0]
-    entropy = np.zeros(dims[2:], dtype="float32")
+    vol_input = vol_input.clamp(min=1e-5)  # Ensure no log(0) issues
+    t_avg = torch.mean(vol_input, dim=0)  # Average over MC samples
+    t_log = torch.log(t_avg)
+    t_entropy = -torch.sum(t_avg * t_log, dim=0)  # Sum over channels
+    return t_entropy
 
-    # Threshold values less than or equal to zero
-    threshold = 0.00005
-    vol_input[vol_input <= threshold] = threshold
-
-    # Determine whether to process as 3D or 2D based on the `dimension` parameter
-    is_3d = len(dims) == 5 if dimension == 3 else len(dims) == 4
-
-    # Compute entropy
-    if is_3d:
-        for channel in range(dims[1]):
-            t_vol = np.squeeze(vol_input[:, channel, ...])
-            t_sum = np.sum(t_vol, axis=0)
-            t_avg = np.divide(t_sum, reps)
-            t_log = np.log(t_avg)
-            t_entropy = -np.multiply(t_avg, t_log)
-            entropy += t_entropy
-    else:
-        t_vol = np.squeeze(vol_input)
-        t_sum = np.sum(t_vol, axis=0)
-        t_avg = np.divide(t_sum, reps)
-        t_log = np.log(t_avg)
-        t_entropy = -np.multiply(t_avg, t_log)
-        entropy += t_entropy
-
-    return entropy
-
-def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
+def select_data_by_uncertainty_with_sw_inference(
+    model: torch.nn.Module, 
+    root_dir: str, 
+    data_loader: DataLoader,
+    device: torch.device,
+    unlabelled_files: List[str],  
+    n: int = 3, 
+    mc_samples: int = 3, 
+    roi_size: Tuple[int, int, int] = (160, 160, 160), 
+    sw_batch_size: int = 4
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
     Selects samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
-
-    Parameters:
-        model: The segmentation model with MC Dropout enabled.
-        data_loader: DataLoader for the unlabeled dataset.
-        device: The device to perform computations on.
-        n: Number of samples to select based on highest uncertainty.
-        mc_samples: Number of Monte Carlo forward passes for uncertainty estimation.
-        roi_size: Size of the ROI to process in one forward pass.
-        sw_batch_size: Number of sliding windows to process in parallel.
-
-    Returns:
-        A tuple containing indices of the selected samples, their uncertainties, and their filenames.
     """
-    # Ensure model is in training mode to use MC Dropout during inference
     model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
-
-    model.train()
+    model.train()  # MC Dropout enabled
+    
     uncertainties = []
 
-    for i, data in enumerate(data_loader):
-        #inputs = inputs.cuda()  # Assuming use of GPU
-        mc_entropies = []
+    for data in data_loader:
+        # Assuming inputs are on GPU if available
+        inputs = data["image"].to(device)
+        mc_predictions = torch.zeros((mc_samples, *inputs.shape[1:], len(inputs)), device=device)
 
-        for _ in range(mc_samples):
+        for mc_sample in range(mc_samples):
             with torch.no_grad():
-                # Use sliding_window_inference for each MC sample
-                outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model, overlap=0.5)
-                # Convert softmax probabilities
-                probabilities = torch.softmax(outputs, dim=1).cpu().numpy()
-                print(probabilities.shape)
-                # Calculate pixel-wise entropy for the current MC sample
-                #mc_entropy = entropy(probabilities, base=2, axis=1)
-                #mc_entropies.append(mc_entropy)
-        
-        # Average entropy across MC samples to get a single uncertainty value per voxel
-        mean_entropy = np.mean(mc_entropies, axis=0)
-        # Average entropy across all voxels for a sample to get overall uncertainty
-        sample_uncertainty = np.mean(mean_entropy)
-        
-        uncertainties.append(sample_uncertainty)
-    # Select n samples with the highest uncertainty
-    indices = np.argsort(uncertainties)
-    print(indices)
+                outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, overlap=0.5)
+                mc_predictions[mc_sample] = torch.softmax(outputs, dim=1)
 
-    predicted_labels = [unlabelled_files[ indices[index]]['image'] for index in indices]
-    return indices, np.array(uncertainties)[indices],predicted_labels
+        # Compute entropy across all MC samples for each voxel
+        mc_entropy = entropy_volume(mc_predictions, 3 if len(inputs.shape) == 5 else 2)
+        sample_uncertainty = torch.mean(mc_entropy).item()  # Mean entropy across spatial dimensions
+        uncertainties.append(sample_uncertainty)
+
+    indices = np.argsort(uncertainties)[-n:]  # Select n samples with highest uncertainty
+    predicted_labels = [unlabelled_files[i] for i in indices]
+
+    return indices, np.array(uncertainties)[indices], predicted_labels
 
 def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: List[str]) -> None:
     """
