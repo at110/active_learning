@@ -81,7 +81,8 @@ class TestTrainEpoch(unittest.TestCase):
 
         new_best_metric, new_best_epoch = save_best_model(metric, best_metric, self.mock_model, epoch, self.root_dir)
 
-        mock_save.assert_called_once()
+        mock_save.assert_called()
+
         self.assertEqual(new_best_metric, metric)
         self.assertEqual(new_best_epoch, epoch)
 

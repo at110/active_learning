@@ -18,6 +18,8 @@ from monai.handlers.utils import from_engine
 import shutil
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
+import subprocess
+
 
 
 
@@ -325,6 +327,7 @@ def setup_mlflow(config: Dict) -> None:
     })
 
 
+
 def prepare_training_environment(config: Dict) -> Tuple[torch.nn.Module, Dict[str, DataLoader], Optimizer, DiceLoss, torch.device]:
     """
     Prepare the model, data loaders, optimizer, and loss function for training.
@@ -388,12 +391,38 @@ def execute_training_and_logging(
     log_nifti_directory_as_artifacts("./predictions")
 
 
+def get_latest_commit_hash(repo_path: str) -> str:
+    """
+    Retrieve the latest commit hash of a Git repository.
 
+    Parameters:
+        repo_path: A string representing the file system path to the Git repository.
+
+    Returns:
+        The latest commit hash as a string.
+    """
+    cmd: List[str] = ['git', '-C', repo_path, 'rev-parse', 'HEAD']
+    commit_hash: str = subprocess.check_output(cmd).decode('utf-8').strip()
+    return commit_hash
+
+
+def log_data_version(repo_path: str) -> None:
+    """
+    Log the latest commit hash of a Git repository to MLflow as a tag.
+
+    Parameters:
+        repo_path: A string representing the file system path to the Git repository.
+    """
+    commit_hash: str = get_latest_commit_hash(repo_path)
+    mlflow.set_tag('data_repo_commit_hash', commit_hash)
+    
 
 def main():
     
     config = load_config()
     setup_mlflow(config)
+    log_data_version(f'{config["data_loader_params"]["data_dir"]}/Spleen-stratified')
+
     model, loaders, optimizer, loss_function, device = prepare_training_environment(config)
     execute_training_and_logging(model, loaders, optimizer, loss_function, device, config)
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )

@@ -8,3 +8,4 @@ mlflow
 boto3
 pynvml
 dvc
+dvc_s3

@@ -10,7 +10,7 @@
       "val_interval": 1
     },
     "data_loader_params": {
-      "data_dir": "./",
+      "data_dir": "../",
       "batch_size": 2,
       "num_workers": 4
     },
