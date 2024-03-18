@@ -49,10 +49,17 @@ def get_unlabelled_transforms() -> Compose:
     return Compose([
         LoadImaged(keys="image"),
         EnsureChannelFirstd(keys="image"),
-        ScaleIntensityRanged(keys=["image"], a_min=0, a_max=200, b_min=0.0, b_max=1.0, clip=True),
-        CropForegroundd(keys=["image"], source_key="image"),
         Orientationd(keys=["image"], axcodes="RAS"),
         Spacingd(keys=["image"], pixdim=(0.79, 0.79, 2.5), mode="bilinear"),
+        ScaleIntensityRanged(
+            keys=["image"],
+            a_min=-0,
+            a_max=200,
+            b_min=0.0,
+            b_max=1.0,
+            clip=True,
+        ),
+        CropForegroundd(keys=["image"], source_key="image"),
     ])
 
 def get_post_transforms_unlabelled() -> Compose:
