@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 import subprocess
 from torch.nn import Module
-from torch.device import Device
+#from torch.device import Device
 
 
 
@@ -146,7 +146,7 @@ def select_data_by_uncertainty_with_sw_inference(
     model: Module, 
     root_dir: str, 
     data_loader: DataLoader,
-    device: Device,
+    device: torch.device,
     unlabelled_files: List[str],  
     n: int = 3, 
     mc_samples: int = 3, 
@@ -184,10 +184,11 @@ def select_data_by_uncertainty_with_sw_inference(
         # Assuming inputs are on GPU if available
         inputs = data["image"].to(device)
         mc_predictions = torch.zeros((mc_samples, *inputs.shape[1:], len(inputs)), device=device)
-
+        
         for mc_sample in range(mc_samples):
             with torch.no_grad():
                 outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, overlap=0.5)
+                print(outputs.shape, mc_predictions.shape)
                 mc_predictions[mc_sample] = torch.softmax(outputs, dim=1)
 
         # Compute entropy across all MC samples for each voxel
