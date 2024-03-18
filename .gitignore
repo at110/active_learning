@@ -3,7 +3,10 @@ __pycache__/
 *.py[cod]
 
 Spleen-stratified
-
+model
+output
+predictions
+*.pth
 # C extensions
 *.so
 

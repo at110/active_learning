@@ -5,9 +5,9 @@ from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
 from monai.transforms import Compose, AsDiscrete
 from monai.data import decollate_batch
-from typing import Tuple
+from typing import Tuple, List, Dict
 from model import build_model  # Adjust the import path as necessary
-from data_loader import create_data_loaders  # Adjust the import path as necessary
+from data_loader import create_data_loaders, get_post_transforms_unlabelled, create_data_loaders_predictions # Adjust the import path as necessary
 import mlflow
 import json
 import numpy as np
@@ -15,6 +15,10 @@ from scipy.stats import entropy
 from typing import List, Tuple
 import nibabel as nib
 from monai.handlers.utils import from_engine
+import shutil
+from torch.utils.data import DataLoader
+from torch.optim import Optimizer
+
 
 
 def train_epoch(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
@@ -118,18 +122,19 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
 
 def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
     """
-    Selects n samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
+    Selects samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
 
-    Args:
+    Parameters:
         model: The segmentation model with MC Dropout enabled.
-        unlabeled_dataset: The dataset of unlabeled samples.
+        data_loader: DataLoader for the unlabeled dataset.
+        device: The device to perform computations on.
         n: Number of samples to select based on highest uncertainty.
         mc_samples: Number of Monte Carlo forward passes for uncertainty estimation.
         roi_size: Size of the ROI to process in one forward pass.
         sw_batch_size: Number of sliding windows to process in parallel.
 
     Returns:
-        indices: Indices of the selected samples based on uncertainty.
+        A tuple containing indices of the selected samples, their uncertainties, and their filenames.
     """
     # Ensure model is in training mode to use MC Dropout during inference
     model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
@@ -164,7 +169,15 @@ def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,de
     predicted_labels = [unlabelled_files[ indices[index]]['image'] for index in indices]
     return indices, np.array(uncertainties)[indices],predicted_labels
 
-def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: List[str]):
+def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: List[str]) -> None:
+    """
+    Logs selected data indices, their uncertainties, and filenames as MLflow artifacts.
+
+    Parameters:
+        indices: Indices of selected samples.
+        uncertainties: Uncertainties associated with the selected samples.
+        filenames: Filenames of the selected samples.
+    """
     # Save indices, uncertainties, and filenames to files
     np.savetxt("indices.txt", indices, fmt='%i')
     np.savetxt("uncertainties.txt", uncertainties)
@@ -172,30 +185,39 @@ def log_to_mlflow(indices: np.ndarray, uncertainties: np.ndarray, filenames: Lis
         json.dump(filenames, f)
 
     # Log files as artifacts
-    mlflow.log_artifact("indices.txt")
-    mlflow.log_artifact("uncertainties.txt")
-    mlflow.log_artifact("filenames.json")
+    mlflow.log_artifact("indices.txt", artifact_path=f'active_learning')
+    mlflow.log_artifact("uncertainties.txt", artifact_path=f'active_learning')
+    mlflow.log_artifact("filenames.json", artifact_path=f'active_learning')
 
     # Cleanup
     os.remove("indices.txt")
     os.remove("uncertainties.txt")
     os.remove("filenames.json")
 
-def save_prediction_as_nifti(model, loader, device, op_dir, root_dir,filenames):
+def save_prediction_as_nifti(
+    model: torch.nn.Module, 
+    loader: torch.utils.data.DataLoader, 
+    device: torch.device, 
+    op_dir: str, 
+    subdir: str, 
+    root_dir: str,
+    filenames: List[Dict[str, str]]
+):
     """
-    Load the model's best state, predict labels for the second batch in the validation loader,
-    and save these predictions as a NIfTI file with an explicit data type conversion to int16.
+    Saves model predictions as NIfTI files.
 
     Parameters:
-    - model: The trained PyTorch model.
-    - val_loader: DataLoader for the validation dataset.
-    - device: The device (e.g., "cpu" or "cuda") on which the model is running.
-    - root_dir: Directory where the best model checkpoint is saved.
-    - output_filename: Name of the output NIfTI file to save the predictions.
+        model: The trained model for generating predictions.
+        loader: DataLoader for the dataset to predict.
+        device: The device on which the model is loaded.
+        output_directory: The directory for saving NIfTI files.
+        filenames: Filenames for the output NIfTI files.
     """
     # Load the best saved model state
-    post_label = Compose([AsDiscrete(to_onehot=2)])
+    post_pred = get_post_transforms_unlabelled()
     os.makedirs(op_dir, exist_ok=True)
+    os.makedirs(f'{op_dir}/{subdir}', exist_ok=True)
+
     model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
     model.eval()
     model.to(device)
@@ -207,14 +229,11 @@ def save_prediction_as_nifti(model, loader, device, op_dir, root_dir,filenames):
             sw_batch_size = 4
             # Perform inference
             #val_outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
-
             data["pred"] = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model)
 
-            data = [post_label(i) for i in decollate_batch(data)]
+            data = [post_pred(i) for i in decollate_batch(data)]
             predictions = from_engine(["pred"])(data)
-            
             predictions = predictions[0].detach().cpu()[1, :, :, :]
-
             ## Convert the predictions tensor to int16 data type
             predictions = predictions.numpy().astype(np.int16)
 
@@ -222,10 +241,21 @@ def save_prediction_as_nifti(model, loader, device, op_dir, root_dir,filenames):
             pred_nifti = nib.Nifti1Image(predictions, affine=np.eye(4))
 
             # Save the NIfTI image to file
-            nib.save(pred_nifti, os.path.join(op_dir, filenames[subject_num]))
-            print(f"Saved predictions as NIfTI file at: {os.path.join(op_dir, filenames[subject_num])}")
-            # Exit the loop after processing the required batch
+            filename = filenames[ subject_num]['image'].split('/')[-1].split('_')[1].split('.')[0]+'.nii.gz'
+            nib.save(pred_nifti, os.path.join(f'{op_dir}/{subdir}',filename))
+            print(f"Saved predictions as NIfTI file at: {os.path.join(f'{op_dir}/{subdir}', filename)}")
             subject_num+=1
+
+def log_nifti_directory_as_artifacts(directory_path: str):
+    """
+    Logs all NIfTI files in a specified directory as MLflow artifacts.
+
+    Parameters:
+        directory_path: The directory containing NIfTI files to log.
+    """
+    mlflow.log_artifacts(directory_path, artifact_path=f'predictions')
+    shutil.rmtree(directory_path)
+
 
 def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoader, 
                  val_loader: torch.utils.data.DataLoader, optimizer: torch.optim.Optimizer, 
@@ -263,28 +293,113 @@ def run_training(model: torch.nn.Module, train_loader: torch.utils.data.DataLoad
             mlflow.log_metric("dice_metric", metric, step=epoch)
             best_metric, _ = save_best_model(metric, best_metric, model, epoch + 1, root_dir)
 
-def main():
-    with open('config.json', 'r') as config_file:
+def load_config(config_path: str = 'config.json') -> Dict:
+    """
+    Load configuration from a JSON file.
+
+    Parameters:
+        config_path: The path to the configuration file.
+
+    Returns:
+        A dictionary containing the configuration.
+    """
+    with open(config_path, 'r') as config_file:
         config = json.load(config_file)
-    
+    return config
+
+
+def setup_mlflow(config: Dict) -> None:
+    """
+    Set up MLflow tracking and experiments based on the configuration.
+
+    Parameters:
+        config: A dictionary containing the MLflow configuration.
+    """
     mlflow.set_tracking_uri(config["mlflow_tracking_uri"])
-    mlflow.set_experiment(config["experiment_name"])  # Set your experiment name
-    mlflow.start_run(log_system_metrics=True)
-   
-
+    mlflow.set_experiment(config["experiment_name"])
+    mlflow.start_run()
     os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
-    mlflow.log_param("learning_rate", config["model_params"]["learning_rate"])
-    mlflow.log_param("batch_size", config["model_params"]["batch_size"])
+    mlflow.log_params({
+        "learning_rate": config["model_params"]["learning_rate"],
+        "batch_size": config["model_params"]["batch_size"]
+    })
 
+
+def prepare_training_environment(config: Dict) -> Tuple[torch.nn.Module, Dict[str, DataLoader], Optimizer, DiceLoss, torch.device]:
+    """
+    Prepare the model, data loaders, optimizer, and loss function for training.
+
+    Parameters:
+        config: A dictionary containing training environment configurations.
+
+    Returns:
+        A tuple containing the model, data loaders, optimizer, loss function, and device.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
-    loaders = create_data_loaders(data_dir=".", batch_size=2, num_workers=4)
-    optimizer = torch.optim.Adam(model.parameters())
+    loaders = create_data_loaders(
+        data_dir=config["data_loader_params"]["data_dir"],
+        batch_size=config["data_loader_params"]["batch_size"],
+        num_workers=config["data_loader_params"]["num_workers"]
+    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["model_params"]["learning_rate"])
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
+    return model, loaders, optimizer, loss_function, device
+
+def log_nifti_directory_as_artifacts(directory_path: str) -> None:
+    """
+    Logs all NIfTI files in a directory as artifacts to the MLflow server.
+
+    Parameters:
+        directory_path: The path to the directory containing NIfTI files to be logged.
+    """
+    mlflow.log_artifacts(directory_path, artifact_path="predictions")
+    shutil.rmtree(directory_path)
+
+def execute_training_and_logging(
+    model: torch.nn.Module,
+    loaders: Dict[str, DataLoader],
+    optimizer: Optimizer,
+    loss_function: DiceLoss,
+    device: torch.device,
+    config: Dict
+) -> None:
+    """
+    Run training and save predictions as NIfTI files, then log to MLflow.
+
+    Parameters:
+        model: The neural network model to be trained.
+        loaders: A dictionary of DataLoader instances for training, validation, and potentially testing.
+        optimizer: The optimizer for training the model.
+        loss_function: The loss function used during training.
+        device: The device (CPU or CUDA) on which to perform training.
+        config: A dictionary containing training and logging configuration.
+    """
+    # Placeholder for run_training function implementation
     run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["training_params"]["max_epochs"], val_interval=config["training_params"]["val_interval"], root_dir=config["root_dir"])
+
+    # Placeholder for save_prediction_as_nifti function implementation
+    loaders_predictions = create_data_loaders_predictions(data_dir=".", batch_size=1, num_workers=4)
+    save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
+    save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
+    save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
+    
+    # Log NIfTI directory as artifacts
+    log_nifti_directory_as_artifacts("./predictions")
+
+
+
+
+def main():
+    
+    config = load_config()
+    setup_mlflow(config)
+    model, loaders, optimizer, loss_function, device = prepare_training_environment(config)
+    execute_training_and_logging(model, loaders, optimizer, loss_function, device, config)
     indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
     log_to_mlflow(indices, uncertainties, files)
-    save_prediction_as_nifti(model, loaders["val"],device, "./output", config["root_dir"], loaders["val_files"])
+
     mlflow.end_run()
+
 if __name__ == "__main__":
     main()

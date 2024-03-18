@@ -49,10 +49,10 @@ def get_unlabelled_transforms() -> Compose:
     return Compose([
         LoadImaged(keys="image"),
         EnsureChannelFirstd(keys="image"),
-        Orientationd(keys=["image"], axcodes="RAS"),
-        Spacingd(keys=["image"], pixdim=(0.79, 0.79, 2.5), mode="bilinear"),
         ScaleIntensityRanged(keys=["image"], a_min=0, a_max=200, b_min=0.0, b_max=1.0, clip=True),
         CropForegroundd(keys=["image"], source_key="image"),
+        Orientationd(keys=["image"], axcodes="RAS"),
+        Spacingd(keys=["image"], pixdim=(0.79, 0.79, 2.5), mode="bilinear"),
     ])
 
 def get_post_transforms_unlabelled() -> Compose:
@@ -86,7 +86,7 @@ def create_data_loaders(data_dir: str, batch_size: int = 2, num_workers: int = 4
 
     test_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesTest", "*.nii.gz")))
     test_labels = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/labelsTest", "*.nii.gz")))
-    test_files = [{"image": img, "label": lbl} for img, lbl in zip(val_images, val_labels)]
+    test_files = [{"image": img, "label": lbl} for img, lbl in zip(test_images, test_labels)]
 
     unlabelled_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
     unlabelled_files = [{"image": img} for img in unlabelled_images]
@@ -104,3 +104,44 @@ def create_data_loaders(data_dir: str, batch_size: int = 2, num_workers: int = 4
     unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, shuffle=False, num_workers=num_workers)
 
     return {"train": train_loader, "val": val_loader, "test":test_loader, "unlabelled": unlabelled_loader, "train_files":train_files, "val_files":val_files, "test_files": test_files, "unlabelled_files":unlabelled_files}
+
+def create_data_loaders_predictions(data_dir: str, batch_size: int = 1, num_workers: int = 4) -> Dict[str, DataLoader]:
+    """
+    Creates and returns DataLoaders for training, validation, and unlabelled datasets.
+
+    Parameters:
+    - data_dir: str - Directory where the datasets are located.
+    - batch_size: int - Batch size for training and validation loaders. Default is 2.
+    - num_workers: int - Number of worker processes for DataLoader. Default is 4.
+
+    Returns:
+    - Dict[str, DataLoader]: A dictionary with 'train', 'val', and 'unlabelled' DataLoaders.
+    """
+    train_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesTrain", "*.nii.gz")))
+    train_labels = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/labelsTrain", "*.nii.gz")))
+    train_files = [{"image": img, "label": lbl} for img, lbl in zip(train_images, train_labels)]
+
+    val_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesVal", "*.nii.gz")))
+    val_labels = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/labelsVal", "*.nii.gz")))
+    val_files = [{"image": img, "label": lbl} for img, lbl in zip(val_images, val_labels)]
+
+    test_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesTest", "*.nii.gz")))
+    test_labels = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/labelsTest", "*.nii.gz")))
+    test_files = [{"image": img, "label": lbl} for img, lbl in zip(test_images, test_labels)]
+
+    unlabelled_images = sorted(glob.glob(os.path.join(data_dir, "Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
+    unlabelled_files = [{"image": img} for img in unlabelled_images]
+
+    train_ds = CacheDataset(data=train_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
+    train_loader = DataLoader(train_ds, batch_size=1, num_workers=num_workers)
+
+    val_ds = CacheDataset(data=val_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=num_workers)
+
+    test_ds = CacheDataset(data=test_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
+    test_loader = DataLoader(test_ds, batch_size=1, num_workers=num_workers)
+
+    #unlabelled_ds = CacheDataset(data=unlabelled_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
+    #unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, shuffle=False, num_workers=num_workers)
+
+    return {"train": train_loader, "val": val_loader, "test":test_loader,  "train_files":train_files, "val_files":val_files, "test_files": test_files}
