@@ -189,7 +189,8 @@ def select_data_by_uncertainty_with_sw_inference(
             with torch.no_grad():
                 outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, overlap=0.5)
                 #outputs = outputs[0].detach().cpu()[1, :, :, :]
-                print(outputs.shape, mc_predictions.shape,inputs.shape)
+                test = torch.softmax(outputs, dim=1)
+                print(outputs.shape, mc_predictions.shape,inputs.shape,test.shape)
                 mc_predictions[mc_sample] = torch.softmax(outputs, dim=1)
 
         # Compute entropy across all MC samples for each voxel
