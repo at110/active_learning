@@ -122,6 +122,54 @@ def save_best_model(metric: float, best_metric: float, model: torch.nn.Module, e
         best_metric_epoch = best_metric_epoch
     return best_metric, best_metric_epoch
 
+def entropy_volume(vol_input: np.ndarray, dimension: int) -> np.ndarray:
+    """
+    Calculate the entropy of a given volumetric input. The input is expected to
+    have dimensions representing repetitions, channels, and volumetric data.
+
+    Parameters:
+        vol_input: The input volume, which can be a NumPy array or a PyTorch tensor.
+            It's expected to have the shape [repetitions, channels, *volume_dims] for
+            3D, or [repetitions, channels, *image_dims] for 2D.
+        dimension: The dimensionality of the volumetric data (2 for 2D images, 3 for 3D volumes).
+
+    Returns:
+        A NumPy array representing the computed entropy volume, with the same spatial
+        dimensions as the input volume.
+    """
+    # Ensure input is a NumPy array
+    vol_input = vol_input.cpu().detach().numpy() if isinstance(vol_input, torch.Tensor) else vol_input
+    vol_input = vol_input.astype(dtype="float32")
+    dims = vol_input.shape
+    reps = dims[0]
+    entropy = np.zeros(dims[2:], dtype="float32")
+
+    # Threshold values less than or equal to zero
+    threshold = 0.00005
+    vol_input[vol_input <= threshold] = threshold
+
+    # Determine whether to process as 3D or 2D based on the `dimension` parameter
+    is_3d = len(dims) == 5 if dimension == 3 else len(dims) == 4
+
+    # Compute entropy
+    if is_3d:
+        for channel in range(dims[1]):
+            t_vol = np.squeeze(vol_input[:, channel, ...])
+            t_sum = np.sum(t_vol, axis=0)
+            t_avg = np.divide(t_sum, reps)
+            t_log = np.log(t_avg)
+            t_entropy = -np.multiply(t_avg, t_log)
+            entropy += t_entropy
+    else:
+        t_vol = np.squeeze(vol_input)
+        t_sum = np.sum(t_vol, axis=0)
+        t_avg = np.divide(t_sum, reps)
+        t_log = np.log(t_avg)
+        t_entropy = -np.multiply(t_avg, t_log)
+        entropy += t_entropy
+
+    return entropy
+
 def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,device: torch.device,unlabelled_files,  n=3, mc_samples=3, roi_size=(160, 160, 160), sw_batch_size=4):
     """
     Selects samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
@@ -154,9 +202,10 @@ def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,de
                 outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model, overlap=0.5)
                 # Convert softmax probabilities
                 probabilities = torch.softmax(outputs, dim=1).cpu().numpy()
+                print(probabilities)
                 # Calculate pixel-wise entropy for the current MC sample
-                mc_entropy = entropy(probabilities, base=2, axis=1)
-                mc_entropies.append(mc_entropy)
+                #mc_entropy = entropy(probabilities, base=2, axis=1)
+                #mc_entropies.append(mc_entropy)
         
         # Average entropy across MC samples to get a single uncertainty value per voxel
         mean_entropy = np.mean(mc_entropies, axis=0)
