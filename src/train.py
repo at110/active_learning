@@ -19,6 +19,9 @@ import shutil
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 import subprocess
+from torch.nn import Module
+from torch.device import Device
+
 
 
 
@@ -140,10 +143,10 @@ def entropy_volume(vol_input: torch.Tensor, dimension: int) -> torch.Tensor:
     return t_entropy
 
 def select_data_by_uncertainty_with_sw_inference(
-    model: torch.nn.Module, 
+    model: Module, 
     root_dir: str, 
     data_loader: DataLoader,
-    device: torch.device,
+    device: Device,
     unlabelled_files: List[str],  
     n: int = 3, 
     mc_samples: int = 3, 
@@ -151,7 +154,26 @@ def select_data_by_uncertainty_with_sw_inference(
     sw_batch_size: int = 4
 ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
-    Selects samples from the unlabeled dataset based on uncertainty using MC Dropout and sliding window inference.
+    Perform Monte Carlo (MC) simulations to select samples from an unlabeled dataset based on uncertainty. 
+    Uncertainty is estimated using the entropy of predictions obtained from multiple stochastic forward passes 
+    (enabled by MC Dropout) through a segmentation model.
+
+    Parameters:
+        model: A PyTorch module representing the segmentation model equipped with MC Dropout.
+        root_dir: The directory where the model's best checkpoint is stored.
+        data_loader: DataLoader object providing access to the unlabeled dataset.
+        device: The device (CPU or CUDA) where computations should be performed.
+        unlabelled_files: A list containing the file paths of unlabeled data samples.
+        n: The number of samples to select based on the highest uncertainty.
+        mc_samples: The number of Monte Carlo forward passes for uncertainty estimation.
+        roi_size: The size of the region of interest to process in one forward pass.
+        sw_batch_size: The number of sliding windows to process in parallel during inference.
+
+    Returns:
+        A tuple containing:
+        - indices of the selected samples based on uncertainty,
+        - their corresponding uncertainties,
+        - and the filenames of the selected samples.
     """
     model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth"), map_location=device))
     model.train()  # MC Dropout enabled
