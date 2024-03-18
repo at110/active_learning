@@ -189,8 +189,6 @@ def select_data_by_uncertainty_with_sw_inference(
             with torch.no_grad():
                 outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, overlap=0.5)
                 outputs = outputs[0].detach().cpu()[1, :, :, :]
-                #test = torch.softmax(outputs, dim=1)
-                print(outputs.shape, mc_predictions.shape,inputs.shape)
                 mc_predictions[mc_sample] = torch.softmax(outputs, dim=1)
 
         # Compute entropy across all MC samples for each voxel
@@ -198,7 +196,7 @@ def select_data_by_uncertainty_with_sw_inference(
         sample_uncertainty = torch.mean(mc_entropy).item()  # Mean entropy across spatial dimensions
         uncertainties.append(sample_uncertainty)
 
-    indices = np.argsort(uncertainties)[-n:]  # Select n samples with highest uncertainty
+    indices = np.argsort(uncertainties) # Select n samples with highest uncertainty
     predicted_labels = [unlabelled_files[i] for i in indices]
 
     return indices, np.array(uncertainties)[indices], predicted_labels
