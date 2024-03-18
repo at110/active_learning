@@ -6,7 +6,7 @@
       "batch_size": 2
     },
     "training_params": {
-      "max_epochs": 50,
+      "max_epochs": 10,
       "val_interval": 1
     },
     "data_loader_params": {
