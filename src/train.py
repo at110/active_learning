@@ -202,7 +202,7 @@ def select_data_by_uncertainty_with_sw_inference(model, root_dir, data_loader,de
                 outputs = sliding_window_inference(data["image"].to(device), roi_size, sw_batch_size, model, overlap=0.5)
                 # Convert softmax probabilities
                 probabilities = torch.softmax(outputs, dim=1).cpu().numpy()
-                print(probabilities)
+                print(probabilities.shape)
                 # Calculate pixel-wise entropy for the current MC sample
                 #mc_entropy = entropy(probabilities, base=2, axis=1)
                 #mc_entropies.append(mc_entropy)
