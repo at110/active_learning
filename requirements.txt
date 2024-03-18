@@ -7,3 +7,4 @@ torch
 mlflow
 boto3
 pynvml
+dvc

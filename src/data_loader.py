@@ -107,7 +107,7 @@ def create_data_loaders(data_dir: str, batch_size: int = 2, num_workers: int = 4
 
 def create_data_loaders_predictions(data_dir: str, batch_size: int = 1, num_workers: int = 4) -> Dict[str, DataLoader]:
     """
-    Creates and returns DataLoaders for training, validation, and unlabelled datasets.
+    Creates and returns DataLoaders for training, validation, and unlabelled datasets for predictions
 
     Parameters:
     - data_dir: str - Directory where the datasets are located.
