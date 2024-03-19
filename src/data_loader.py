@@ -67,7 +67,7 @@ def get_post_transforms_unlabelled() -> Compose:
     return Compose([
         Invertd(keys="pred", transform=get_unlabelled_transforms(), orig_keys="image",
                 meta_keys="pred_meta_dict", orig_meta_keys="image_meta_dict",
-                meta_key_postfix="meta_dict", nearest_interp=False, to_tensor=True, device="cpu"),
+                meta_key_postfix="meta_dict", nearest_interp=False, to_tensor=True),
         AsDiscreted(keys="pred", argmax=True, to_onehot=2),
     ])
 
