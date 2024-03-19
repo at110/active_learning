@@ -22,6 +22,24 @@ import subprocess
 from torch.nn import Module
 #from torch.device import Device
 
+import glob
+from monai.data import CacheDataset, DataLoader
+from monai.transforms import (
+    AsDiscrete,
+    AsDiscreted,
+    Compose,
+    CropForegroundd,
+    EnsureChannelFirstd,
+    LoadImaged,
+    Orientationd,
+    RandAffined,
+    RandCropByPosNegLabeld,
+    ScaleIntensityRanged,
+    Spacingd,
+    Invertd,
+)
+
+
 def load_config(config_path: str = 'config.json') -> Dict:
     """
     Load configuration from a JSON file.
@@ -123,12 +141,33 @@ def main():
     loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
-    save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
+    #save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
     #save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
     #save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
     #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
+    unlabelled_transforms = Compose(
+    [
+        LoadImaged(keys="image"),
+        EnsureChannelFirstd(keys="image"),
+        ScaleIntensityRanged(
+            keys=["image"],
+            a_min=-0,
+            a_max=200,
+            b_min=0.0,
+            b_max=1.0,
+            clip=True,
+        ),
+        CropForegroundd(keys=["image"], source_key="image"),
+        Orientationd(keys=["image"], axcodes="RAS"),
+        Spacingd(keys=["image"], pixdim=(1.5, 1.5, 2.0), mode="bilinear"),
+    ]
+    )
+    unlabelled_images = sorted(glob.glob(os.path.join( "../Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
+    unlabelled_files = [{"image": img} for img in unlabelled_images]
 
-
+    unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=4)
+    unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=4)
+    save_prediction_as_nifti(model, unlabelled_loader,device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
     log_nifti_directory_as_artifacts("./predictions")
 
