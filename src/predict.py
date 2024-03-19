@@ -137,15 +137,9 @@ def log_nifti_directory_as_artifacts(directory_path: str):
 def main():
     
     config = load_config()
-    #setup_mlflow(config)
 
-    #loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
-    #save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
-    #save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
-    #save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
-    #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
     
     unlabelled_transforms = Compose(
     [
@@ -184,20 +178,42 @@ def main():
     ]
     )
 
-    unlabelled_images = sorted(glob.glob(os.path.join( "../Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
+    train_images = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/imagesTrain", "*.nii.gz")))
+    train_labels = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/labelsTrain", "*.nii.gz")))
+    train_files = [{"image": img, "label": lbl} for img, lbl in zip(train_images, train_labels)]
+
+    val_images = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/imagesVal", "*.nii.gz")))
+    val_labels = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/labelsVal", "*.nii.gz")))
+    val_files = [{"image": img, "label": lbl} for img, lbl in zip(val_images, val_labels)]
+
+    test_images = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/imagesTest", "*.nii.gz")))
+    test_labels = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/labelsTest", "*.nii.gz")))
+    test_files = [{"image": img, "label": lbl} for img, lbl in zip(test_images, test_labels)]
+
+    unlabelled_images = sorted(glob.glob(os.path.join(config["data_loader_params"]["data_dir"], "Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
     unlabelled_files = [{"image": img} for img in unlabelled_images]
 
-    unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=4)
-    unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=4)
-    save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","val", config["root_dir"], unlabelled_files)
+    train_ds = CacheDataset(data=train_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=config["data_loader_params"]["num_workers"])
+    train_loader = DataLoader(train_ds, batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+
+    val_ds = CacheDataset(data=val_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=config["data_loader_params"]["num_workers"])
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+
+    test_ds = CacheDataset(data=test_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=config["data_loader_params"]["num_workers"])
+    test_loader = DataLoader(test_ds, batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+
+    unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=config["data_loader_params"]["num_workers"])
+    unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+    
+    save_prediction_as_nifti(model, train_loader,     post_transforms_unlabelled, device, "./predictions","train"     , config["root_dir"], unlabelled_files)
+    save_prediction_as_nifti(model, val_loader,       post_transforms_unlabelled, device, "./predictions","val"       , config["root_dir"], unlabelled_files)
+    save_prediction_as_nifti(model, test_loader,      post_transforms_unlabelled, device, "./predictions","test"      , config["root_dir"], unlabelled_files)
+    save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
 
     #save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
-    
-    
+     
     log_nifti_directory_as_artifacts("./predictions")
-
-    #mlflow.end_run()
 
 if __name__ == "__main__":
     main()
