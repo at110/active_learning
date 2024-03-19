@@ -7,7 +7,7 @@ from monai.transforms import Compose, AsDiscrete
 from monai.data import decollate_batch
 from typing import Tuple, List, Dict
 from model import build_model  # Adjust the import path as necessary
-from data_loader import create_data_loaders, get_post_transforms_unlabelled, create_data_loaders_predictions # Adjust the import path as necessary
+from data_loader import create_data_loaders, get_post_transforms_unlabelled #create_data_loaders_predictions # Adjust the import path as necessary
 import mlflow
 import json
 import numpy as np
@@ -412,14 +412,14 @@ def execute_training_and_logging(
     run_training(model, loaders["train"], loaders["val"], optimizer, loss_function, device, max_epochs=config["training_params"]["max_epochs"], val_interval=config["training_params"]["val_interval"], root_dir=config["root_dir"])
 
     # Placeholder for save_prediction_as_nifti function implementation
-    loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
-    save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
-    save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
-    save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
+    #loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+    #save_prediction_as_nifti(model, loaders["val"],device, "./predictions","val", config["root_dir"], loaders["val_files"])
+    #save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
+    #save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
     #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
 
     # Log NIfTI directory as artifacts
-    log_nifti_directory_as_artifacts("./predictions")
+    #log_nifti_directory_as_artifacts("./predictions")
 
 
 def get_latest_commit_hash(repo_path: str) -> str:
