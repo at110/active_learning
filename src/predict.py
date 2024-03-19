@@ -138,7 +138,7 @@ def main():
     config = load_config()
     setup_mlflow(config)
 
-    loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+    #loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
     #save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
