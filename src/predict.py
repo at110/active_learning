@@ -74,6 +74,7 @@ def setup_mlflow(config: Dict) -> None:
 def save_prediction_as_nifti(
     model,
     loader, 
+    post_transforms_unlabelled,
     device, 
     op_dir, 
     subdir, 
@@ -138,14 +139,14 @@ def main():
     config = load_config()
     setup_mlflow(config)
 
-    loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
+    #loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model().to(device)
-    save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
+    #save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
     #save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
     #save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
     #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
-    """
+    
     unlabelled_transforms = Compose(
     [
         LoadImaged(keys="image"),
@@ -191,7 +192,7 @@ def main():
     save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
     
-    """
+    
     log_nifti_directory_as_artifacts("./predictions")
 
     mlflow.end_run()
