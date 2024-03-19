@@ -148,7 +148,7 @@ def create_data_loaders_predictions(data_dir: str, batch_size: int = 1, num_work
     test_ds = CacheDataset(data=test_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
     test_loader = DataLoader(test_ds, batch_size=1, num_workers=num_workers)
 
-    unlabelled_ds = CacheDataset(data=unlabelled_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
-    unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, shuffle=False, num_workers=num_workers)
+    #unlabelled_ds = CacheDataset(data=unlabelled_files, transform=get_unlabelled_transforms(), cache_rate=1.0, num_workers=num_workers)
+    #unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, shuffle=False, num_workers=num_workers)
 
-    return {"train": train_loader, "val": val_loader, "test":test_loader, "unlabelled":unlabelled_loader,   "train_files":train_files, "val_files":val_files, "test_files": test_files, "unlabelled_files": unlabelled_files}
+    return {"train": train_loader, "val": val_loader, "test":test_loader,   "train_files":train_files, "val_files":val_files, "test_files": test_files}

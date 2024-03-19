@@ -416,7 +416,7 @@ def execute_training_and_logging(
     save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
     save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
     save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
-    save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
+    #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
 
     # Log NIfTI directory as artifacts
     log_nifti_directory_as_artifacts("./predictions")
@@ -456,8 +456,8 @@ def main():
 
     model, loaders, optimizer, loss_function, device = prepare_training_environment(config)
     execute_training_and_logging(model, loaders, optimizer, loss_function, device, config)
-    indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
-    log_to_mlflow(indices, uncertainties, files)
+    #indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
+    #log_to_mlflow(indices, uncertainties, files)
 
     mlflow.end_run()
 
