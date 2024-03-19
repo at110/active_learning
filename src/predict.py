@@ -184,12 +184,12 @@ def main():
     ]
     )
 
-    #unlabelled_images = sorted(glob.glob(os.path.join( "../Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
-    #unlabelled_files = [{"image": img} for img in unlabelled_images]
+    unlabelled_images = sorted(glob.glob(os.path.join( "../Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
+    unlabelled_files = [{"image": img} for img in unlabelled_images]
 
-    #unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=4)
-    #unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=4)
-    save_prediction_as_nifti(model, loaders_predictions["val"],post_transforms_unlabelled, device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
+    unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=4)
+    unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=4)
+    save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
 
     #save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
