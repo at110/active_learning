@@ -72,13 +72,14 @@ def setup_mlflow(config: Dict) -> None:
     })
 
 def save_prediction_as_nifti(
-    model: torch.nn.Module, 
-    loader: torch.utils.data.DataLoader, 
-    device: torch.device, 
-    op_dir: str, 
-    subdir: str, 
-    root_dir: str,
-    filenames: List[Dict[str, str]]
+    model,
+    loader, 
+    post_transforms_unlabelled, 
+    device,
+    op_dir, 
+    subdir, 
+    root_dir,
+    filenames
 ):
     """
     Saves model predictions as NIfTI files.
@@ -91,7 +92,7 @@ def save_prediction_as_nifti(
         filenames: Filenames for the output NIfTI files.
     """
     # Load the best saved model state
-    post_pred = get_post_transforms_unlabelled()
+    post_pred = post_transforms_unlabelled
     os.makedirs(op_dir, exist_ok=True)
     os.makedirs(f'{op_dir}/{subdir}', exist_ok=True)
     print(device)
@@ -162,12 +163,32 @@ def main():
         Spacingd(keys=["image"], pixdim=(1.5, 1.5, 2.0), mode="bilinear"),
     ]
     )
+
+    post_transforms_unlabelled = Compose(
+    [
+        Invertd(
+            keys="pred",
+            transform=unlabelled_transforms,
+            orig_keys="image",
+            meta_keys="pred_meta_dict",
+            orig_meta_keys="image_meta_dict",
+            meta_key_postfix="meta_dict",
+            nearest_interp=False,
+            to_tensor=True,
+            device="cpu",
+            allow_missing_keys=True
+        ),
+        AsDiscreted(keys="pred", argmax=True, to_onehot=2),
+        #AsDiscreted(keys="label", to_onehot=2),
+    ]
+    )
+
     unlabelled_images = sorted(glob.glob(os.path.join( "../Spleen-stratified/imagesUnlabelled", "*.nii.gz")))
     unlabelled_files = [{"image": img} for img in unlabelled_images]
 
     unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=4)
     unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=4)
-    save_prediction_as_nifti(model, unlabelled_loader,device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
+    save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
     log_nifti_directory_as_artifacts("./predictions")
 
