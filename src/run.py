@@ -63,9 +63,9 @@ if __name__ == "__main__":
     config = load_config()
     setup_mlflow(config)
 
-    if args.mode == "train":
-        train.main()
-    elif args.mode == "predict":
-        predict.main()
+    
+    train.main()
+   
+    predict.main()
     
     mlflow.end_run()

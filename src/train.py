@@ -451,15 +451,15 @@ def log_data_version(repo_path: str) -> None:
 def main():
     
     config = load_config()
-    setup_mlflow(config)
+    #setup_mlflow(config)
     log_data_version(f'{config["data_loader_params"]["data_dir"]}/Spleen-stratified')
 
     model, loaders, optimizer, loss_function, device = prepare_training_environment(config)
     execute_training_and_logging(model, loaders, optimizer, loss_function, device, config)
-    #indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
-    #log_to_mlflow(indices, uncertainties, files)
+    indices,uncertainties,files = select_data_by_uncertainty_with_sw_inference(model,config["root_dir"], loaders["unlabelled"],device, loaders["unlabelled_files"] )
+    log_to_mlflow(indices, uncertainties, files)
 
-    mlflow.end_run()
+    #mlflow.end_run()
 
 if __name__ == "__main__":
     main()
