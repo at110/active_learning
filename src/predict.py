@@ -205,9 +205,9 @@ def main():
     unlabelled_ds = CacheDataset(data=unlabelled_files, transform=unlabelled_transforms, cache_rate=1.0, num_workers=config["data_loader_params"]["num_workers"])
     unlabelled_loader = DataLoader(unlabelled_ds, batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
     
-    save_prediction_as_nifti(model, train_loader,     post_transforms_unlabelled, device, "./predictions","train"     , config["root_dir"], unlabelled_files)
-    save_prediction_as_nifti(model, val_loader,       post_transforms_unlabelled, device, "./predictions","val"       , config["root_dir"], unlabelled_files)
-    save_prediction_as_nifti(model, test_loader,      post_transforms_unlabelled, device, "./predictions","test"      , config["root_dir"], unlabelled_files)
+    save_prediction_as_nifti(model, train_loader,     post_transforms_unlabelled, device, "./predictions","train"     , config["root_dir"], train_files)
+    save_prediction_as_nifti(model, val_loader,       post_transforms_unlabelled, device, "./predictions","val"       , config["root_dir"], val_files)
+    save_prediction_as_nifti(model, test_loader,      post_transforms_unlabelled, device, "./predictions","test"      , config["root_dir"], test_files)
     save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
 
     #save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
