@@ -1,11 +1,13 @@
-matplotlib
-monai-weekly[gdown, nibabel, tqdm, ignite]
-numpy
-scipy
-nibabel
-torch
 mlflow
+cffi==1.16.0
+cloudpickle==3.0.0
+gdown==5.1.0
+matplotlib==3.8.3
+monai-weekly==1.4.dev2411
+nibabel==5.2.1
+psutil==5.9.8
+pydot==2.0.0
+pynvml==11.5.0
+pytorch-ignite==0.4.11
+torch==2.2.1
 boto3
-pynvml
-dvc
-dvc_s3
