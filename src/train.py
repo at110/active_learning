@@ -413,9 +413,9 @@ def execute_training_and_logging(
 
     # Placeholder for save_prediction_as_nifti function implementation
     loaders_predictions = create_data_loaders_predictions(data_dir=config["data_loader_params"]["data_dir"], batch_size=1, num_workers=config["data_loader_params"]["num_workers"])
-    save_prediction_as_nifti(model, loaders_predictions["val"],torch.device("cpu"), "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
-    save_prediction_as_nifti(model, loaders_predictions["test"],torch.device("cpu"), "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
-    save_prediction_as_nifti(model, loaders_predictions["train"],torch.device("cpu"), "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
+    save_prediction_as_nifti(model, loaders_predictions["val"],device, "./predictions","val", config["root_dir"], loaders_predictions["val_files"])
+    save_prediction_as_nifti(model, loaders_predictions["test"],device, "./predictions","test", config["root_dir"], loaders_predictions["test_files"])
+    save_prediction_as_nifti(model, loaders_predictions["train"],device, "./predictions","train", config["root_dir"], loaders_predictions["train_files"])
     #save_prediction_as_nifti(model, loaders_predictions["unlabelled"],device, "./predictions","unlabelled", config["root_dir"], loaders_predictions["unlabelled_files"])
 
     # Log NIfTI directory as artifacts
