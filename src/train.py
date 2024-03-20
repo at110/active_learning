@@ -160,7 +160,7 @@ def entropy_volume(vol_input:torch.Tensor) -> torch.Tensor:
             t_sum = torch.sum(t_vol, axis=0)
             t_avg = torch.divide(t_sum, reps)
             t_log = torch.log(t_avg)
-            t_entropy = -torch.multiply(t_avg, t_log)
+            t_entropy = -torch.multiply(t_avg, t_log).cpu()
             entropy = entropy + t_entropy
         
         # Returns a 3D volume of entropy
