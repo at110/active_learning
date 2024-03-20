@@ -173,7 +173,7 @@ def select_data_by_uncertainty_with_sw_inference(
     device: torch.device,
     unlabelled_files: List[str],  
     n: int = 3, 
-    mc_samples: int = 3, 
+    mc_samples: int = 40, 
     roi_size: Tuple[int, int, int] = (160, 160, 160), 
     sw_batch_size: int = 4
 ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
