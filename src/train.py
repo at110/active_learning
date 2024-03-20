@@ -148,7 +148,7 @@ def entropy_volume(vol_input:torch.Tensor) -> torch.Tensor:
         vol_input = vol_input.type(torch.float32)
         dims = vol_input.shape
         reps = dims[0]
-        entropy = torch.zeros(dims[2:], dtype=torch.float32)
+        entropy = torch.zeros(dims[2:], dtype=torch.float32).cpu()
 
         # Threshold values less than or equal to zero
         threshold = 0.00005
