@@ -21,7 +21,7 @@ from torch.optim import Optimizer
 import subprocess
 from torch.nn import Module
 #from torch.device import Device
-
+from train import load_config
 import glob
 from monai.data import CacheDataset, DataLoader
 from monai.transforms import (
@@ -40,36 +40,36 @@ from monai.transforms import (
 )
 
 
-def load_config(config_path: str = 'config.json') -> Dict:
-    """
-    Load configuration from a JSON file.
+#def load_config(config_path: str = 'config.json') -> Dict:
+#    """
+#    Load configuration from a JSON file.
 
-    Parameters:
-        config_path: The path to the configuration file.
+#    Parameters:
+#        config_path: The path to the configuration file.
 
-    Returns:
-        A dictionary containing the configuration.
-    """
-    with open(config_path, 'r') as config_file:
-        config = json.load(config_file)
-    return config
+#    Returns:
+#        A dictionary containing the configuration.
+#    """
+#    with open(config_path, 'r') as config_file:
+#        config = json.load(config_file)
+#    return config
 
 
-def setup_mlflow(config: Dict) -> None:
-    """
-    Set up MLflow tracking and experiments based on the configuration.
-
-    Parameters:
-        config: A dictionary containing the MLflow configuration.
-    """
-    mlflow.set_tracking_uri(config["mlflow_tracking_uri"])
-    mlflow.set_experiment(config["experiment_name"])
-    mlflow.start_run()
-    os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
-    mlflow.log_params({
-        "learning_rate": config["model_params"]["learning_rate"],
-        "batch_size": config["model_params"]["batch_size"]
-    })
+#def setup_mlflow(config: Dict) -> None:
+#    """
+#    Set up MLflow tracking and experiments based on the configuration.
+#
+#    Parameters:
+#        config: A dictionary containing the MLflow configuration.
+#    """
+#    mlflow.set_tracking_uri(config["mlflow_tracking_uri"])
+#    mlflow.set_experiment(config["experiment_name"])
+#    mlflow.start_run()
+#    os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
+#    mlflow.log_params({
+#        "learning_rate": config["model_params"]["learning_rate"],
+#        "batch_size": config["model_params"]["batch_size"]
+#    })
 
 def save_prediction_as_nifti(
     model,
@@ -85,11 +85,11 @@ def save_prediction_as_nifti(
     Saves model predictions as NIfTI files.
 
     Parameters:
-        model: The trained model for generating predictions.
-        loader: DataLoader for the dataset to predict.
-        device: The device on which the model is loaded.
-        output_directory: The directory for saving NIfTI files.
-        filenames: Filenames for the output NIfTI files.
+        - model: The trained model for generating predictions.
+        - loader: DataLoader for the dataset to predict.
+        - device: The device on which the model is loaded.
+        - output_directory: The directory for saving NIfTI files.
+        - filenames: Filenames for the output NIfTI files.
     """
     # Load the best saved model state
     post_pred = post_transforms_unlabelled
@@ -129,7 +129,7 @@ def log_nifti_directory_as_artifacts(directory_path: str):
     Logs all NIfTI files in a specified directory as MLflow artifacts.
 
     Parameters:
-        directory_path: The directory containing NIfTI files to log.
+        - directory_path: The directory containing NIfTI files to log.
     """
     mlflow.log_artifacts(directory_path, artifact_path=f'predictions')
     shutil.rmtree(directory_path)
@@ -210,7 +210,6 @@ def main():
     save_prediction_as_nifti(model, test_loader,      post_transforms_unlabelled, device, "./predictions","test"      , config["root_dir"], test_files)
     save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
 
-    #save_prediction_as_nifti(model, unlabelled_loader,post_transforms_unlabelled, device, "./predictions","unlabelled", config["root_dir"], unlabelled_files)
     # Log NIfTI directory as artifacts
      
     log_nifti_directory_as_artifacts("./predictions")

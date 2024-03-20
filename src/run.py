@@ -23,20 +23,21 @@ from torch.optim import Optimizer
 import subprocess
 from torch.nn import Module
 #from torch.device import Device
+from train import load_config
 
-def load_config(config_path: str = 'config.json') -> Dict:
-    """
-    Load configuration from a JSON file.
-
-    Parameters:
-        config_path: The path to the configuration file.
-
-    Returns:
-        A dictionary containing the configuration.
-    """
-    with open(config_path, 'r') as config_file:
-        config = json.load(config_file)
-    return config
+#def load_config(config_path: str = 'config.json') -> Dict:
+#    """
+#    Load configuration from a JSON file.
+#
+#    Parameters:
+#        config_path: The path to the configuration file.
+#
+#    Returns:
+#        A dictionary containing the configuration.
+#    """
+#    with open(config_path, 'r') as config_file:
+#        config = json.load(config_file)
+#    return config
 
 
 def setup_mlflow(config: Dict) -> None:
@@ -57,13 +58,13 @@ def setup_mlflow(config: Dict) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Spleen Segmentation Task")
-    parser.add_argument("--mode", type=str, choices=["train", "predict"], help="Run mode: train or predict.")
-    args = parser.parse_args()
+    #parser = argparse.ArgumentParser(description="Spleen Segmentation Task")
+    # parser.add_argument("--mode", type=str, choices=["train", "predict"], help="Run mode: train or predict.")
+    #args = parser.parse_args()
     config = load_config()
+    
     setup_mlflow(config)
 
-    
     train.main()
    
     predict.main()
