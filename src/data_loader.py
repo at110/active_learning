@@ -26,10 +26,10 @@ def get_train_transforms() -> Compose:
         ScaleIntensityRanged(keys=["image"], a_min=0, a_max=200, b_min=0.0, b_max=1.0, clip=True),
         CropForegroundd(keys=["image", "label"], source_key="image"),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Spacingd(keys=["image", "label"], pixdim=(0.79, 0.79, 2.5), mode=("bilinear", "nearest")),
-        RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(64, 64, 64),
+        Spacingd(keys=["image", "label"], pixdim=(1.5, 1.5, 1.5), mode=("bilinear", "nearest")),
+        RandCropByPosNegLabeld(keys=["image", "label"], label_key="label", spatial_size=(98, 98, 98),
                                pos=1, neg=1, num_samples=4, image_key="image", image_threshold=0),
-        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=1.0, spatial_size=(64, 64, 64),
+        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=1.0, spatial_size=(98, 98, 98),
                     rotate_range=(0, 0, np.pi/15), scale_range=(0.1, 0.1, 0.1)),
     ])
 
